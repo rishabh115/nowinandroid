@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.windowInsetsStartWidth
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.SnackbarDuration.Indefinite
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.Posture
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -68,8 +67,8 @@ import com.google.samples.apps.nowinandroid.core.data.util.NetworkMonitor
 import com.google.samples.apps.nowinandroid.core.data.util.TimeZoneMonitor
 import com.google.samples.apps.nowinandroid.core.designsystem.theme.NiaTheme
 import com.google.samples.apps.nowinandroid.core.testing.util.DefaultRoborazziOptions
+import com.google.samples.apps.nowinandroid.feature.bookmarks.impl.navigation.LocalSnackbarHostState
 import com.google.samples.apps.nowinandroid.uitesthiltmanifest.HiltComponentActivity
-import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
@@ -80,7 +79,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -108,17 +106,9 @@ class SnackbarInsetsScreenshotTests {
     val hiltRule = HiltAndroidRule(this)
 
     /**
-     * Create a temporary folder used to create a Data Store file. This guarantees that
-     * the file is removed in between each test, preventing a crash.
-     */
-    @BindValue
-    @get:Rule(order = 1)
-    val tmpFolder: TemporaryFolder = TemporaryFolder.builder().assureDeletion().build()
-
-    /**
      * Use a test activity to set the content on.
      */
-    @get:Rule(order = 2)
+    @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule<HiltComponentActivity>()
 
     @Inject
@@ -158,9 +148,7 @@ class SnackbarInsetsScreenshotTests {
 
     @Test
     fun phone_noSnackbar() {
-        val snackbarHostState = SnackbarHostState()
         testSnackbarScreenshotWithSize(
-            snackbarHostState,
             400.dp,
             500.dp,
             "insets_snackbar_compact_medium_noSnackbar",
@@ -170,13 +158,11 @@ class SnackbarInsetsScreenshotTests {
 
     @Test
     fun snackbarShown_phone() {
-        val snackbarHostState = SnackbarHostState()
         testSnackbarScreenshotWithSize(
-            snackbarHostState,
             400.dp,
             500.dp,
             "insets_snackbar_compact_medium",
-        ) {
+        ) { snackbarHostState ->
             snackbarHostState.showSnackbar(
                 "This is a test snackbar message",
                 actionLabel = "Action Label",
@@ -187,13 +173,11 @@ class SnackbarInsetsScreenshotTests {
 
     @Test
     fun snackbarShown_foldable() {
-        val snackbarHostState = SnackbarHostState()
         testSnackbarScreenshotWithSize(
-            snackbarHostState,
             600.dp,
             600.dp,
             "insets_snackbar_medium_medium",
-        ) {
+        ) { snackbarHostState ->
             snackbarHostState.showSnackbar(
                 "This is a test snackbar message",
                 actionLabel = "Action Label",
@@ -204,13 +188,11 @@ class SnackbarInsetsScreenshotTests {
 
     @Test
     fun snackbarShown_tablet() {
-        val snackbarHostState = SnackbarHostState()
         testSnackbarScreenshotWithSize(
-            snackbarHostState,
             900.dp,
             900.dp,
             "insets_snackbar_expanded_expanded",
-        ) {
+        ) { snackbarHostState ->
             snackbarHostState.showSnackbar(
                 "This is a test snackbar message",
                 actionLabel = "Action Label",
@@ -219,19 +201,19 @@ class SnackbarInsetsScreenshotTests {
         }
     }
 
-    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
     private fun testSnackbarScreenshotWithSize(
-        snackbarHostState: SnackbarHostState,
         width: Dp,
         height: Dp,
         screenshotName: String,
-        action: suspend () -> Unit,
+        action: suspend (snackbarHostState: SnackbarHostState) -> Unit,
     ) {
         lateinit var scope: CoroutineScope
+        val snackbarHostState = SnackbarHostState()
         composeTestRule.setContent {
             CompositionLocalProvider(
                 // Replaces images with placeholders
                 LocalInspectionMode provides true,
+                LocalSnackbarHostState provides snackbarHostState,
             ) {
                 scope = rememberCoroutineScope()
 
@@ -271,7 +253,6 @@ class SnackbarInsetsScreenshotTests {
                                 )
                                 NiaApp(
                                     appState = appState,
-                                    snackbarHostState = snackbarHostState,
                                     showSettingsDialog = false,
                                     onSettingsDismissed = {},
                                     onTopAppBarActionClick = {},
@@ -292,7 +273,7 @@ class SnackbarInsetsScreenshotTests {
         }
 
         scope.launch {
-            action()
+            action(snackbarHostState)
         }
 
         composeTestRule.onNodeWithTag("root")
